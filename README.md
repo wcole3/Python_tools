@@ -5,7 +5,7 @@ Brief description of each tool:
 
 Hex_fitting: script to fit assigned hexamer transitions to a various rigid-rotor models
 
-MG_fitting: script to fit measured second harmonic scattering intensities to a Langmuir isotherm; also functionality for
+MG_fitting(THIS IS OUTDATED AND WILL BE UPDATED SOON 03/27): script to fit measured second harmonic scattering intensities to a Langmuir isotherm; also functionality for
 fitting competitive adsorption to a displacment Langmuir model
 
 PLOT shell_use: old plotting script used to quickly plot spectra obtained from VRT experiment
