@@ -8,7 +8,6 @@ The isotherm is modified to account for adsorbate bulk concentration change
 resulting from adsorption
 
 3/30/19: TODO  
- Add write out funtion for both fit results
  Add function to plot disp molecule coverage version total coverage
  Add ext main to run batch fits 
 
@@ -23,8 +22,8 @@ import scipy.optimize as sp
 
 #import the dataset
 #format will be two columns of [Conc., Int.]
-caliDataName = 'SNP_MG_cali_pH_8'
-dispDataName = 'SNP_AA_disp_60uMMG_pH_8'
+caliDataName = '1um_SNP_MG_SP'
+dispDataName = '1um_SNP_MG_CTAB_SP'
 
 def LangmuirCurve(x, B,a,N,K):
     """Calculate the Langmuir curve for the calibration data set
@@ -83,6 +82,12 @@ def DispCurve(c,x,B,a,N,K):
     """
     return B+np.square(a*(x/(1+x+(K*((c-N)/55.5)))))
 
+def DispDyeCoverage(c_1, c_2, N_d, K_1, K_2):
+    x = K_1 * ((c_1 - N_d)/55.5)
+    y = K_2 * ((c_2 - N_d)/55.5)
+    return (x / (1 + x + y))
+
+
 def fitCaliCurve(filename):
     """Fit the calibration curve data the to Langmuir model
     Parameters
@@ -106,7 +111,7 @@ def fitCaliCurve(filename):
     return constants, corr, data
 
 
-def calcCaliCorrandR(constants, corr, data):
+def calcCaliCorrandR(constants, corr, data, outName):
     """Calculates the correlation matrix and the R^2 value for the 
     Parameters
     ----------
@@ -115,6 +120,8 @@ def calcCaliCorrandR(constants, corr, data):
     corr : the covariance matrix obtained from fitCaliCurve
     
     data : the measured experimental data
+    
+    outName : the header for the outputted text file
     
     """
     print(constants)
@@ -140,6 +147,22 @@ def calcCaliCorrandR(constants, corr, data):
     print(ss_total)
     r_sq = 1 - (ss_res/ss_total)
     print(r_sq)
+    #write out the fit results
+    f = open(outName + "_cali_constants.txt", 'w')
+    f.write("B\ta\tN\tK\n")
+    for i in range(len(constants)):
+        f.write('%.9f' %constants[i] + "\t")
+    f.write("\n\n")
+    for i in range(len(corr)):
+        f.write('%.9f' %perr[i] + "\t")
+    f.write("\n\n")
+    f.write("Correlation matrix :\n\n")
+    for i in range(len(corr)):
+        for j in range(len(corr)):
+            f.write('%.9f' %corrmat[i,j]+'\t')
+        f.write("\n\n")
+    f.write("R^2 value : \t" + '%.9f' %r_sq)
+    f.close()
 
                   
 def plotCaliCurve(constants, data, outName):
@@ -158,9 +181,9 @@ def plotCaliCurve(constants, data, outName):
     plt.rcParams.update({'font.size' : 16})
     plt.scatter(data[:,0]*1000,data[:,1])
     plt.plot(x*1000,LangmuirCurve(x,constants[0],constants[1],constants[2],constants[3]))
-    plt.xlabel("MG Concentration (nM)")
-    plt.ylabel("Relative SHS signal (Arb. Units)")
-    plt.savefig(outName + "_model_plot.png")
+    #plt.xlabel("MG Concentration (nM)")
+    #plt.ylabel("Relative SHS signal (Arb. Units)")
+    plt.savefig(outName + "_cali_model_plot.png")
     plt.show()
 
 
@@ -178,12 +201,14 @@ def plotCaliCoverage(constants, data, outName):
     """
     x=np.linspace(min(data[:,0]),max(data[:,0]),1000)
     plt.figure()
+    plt.rcParams.update({'font.size' : 16})
     plt.plot(x, Frac_Cov(x,constants[2], constants[3]))
     plt.ylim([0,1])
+    plt.savefig(outName + "_cali_coverage_plot.png")
     plt.show()
 
 
-
+####Start of methods for displacement curve fitting
 def fitDispCurve(fileName, caliConst):
     """Fit the displacement data to the displacement curve
     Parameters
@@ -212,7 +237,7 @@ def fitDispCurve(fileName, caliConst):
     
     return aaconst, aacorr, AAdata
 
-def calcDispCorrandR(aaconst, aacorr, caliConst, AAdata):
+def calcDispCorrandR(aaconst, aacorr, caliConst, AAdata, outName):
     """Calculate the displacement curve and the R^2 value for the fit
     Parameters
     ----------
@@ -223,6 +248,8 @@ def calcDispCorrandR(aaconst, aacorr, caliConst, AAdata):
     caliConst : the constants obtained from fitCaliCurve
     
     AAdata : the experimental data for the displacement data
+    
+    outName : the output file name header
     
     """
     k=caliConst[3]
@@ -251,7 +278,22 @@ def calcDispCorrandR(aaconst, aacorr, caliConst, AAdata):
     print(AAss_total)
     AAr_sq = 1 - (AAss_res/AAss_total)
     print(AAr_sq)
-
+    #write out the fit results
+    f = open(outName + "_disp_constants.txt", 'w')
+    f.write("B\ta\tN\tK\n")
+    for i in range(len(aaconst)):
+        f.write('%.9f' %aaconst[i] + "\t")
+    f.write("\n")
+    for i in range(len(aacorr)):
+        f.write('%.9f' %perr2[i] + "\t")
+    f.write("\n\n")
+    f.write("Correlation matrix :\n\n")
+    for i in range(len(aacorr)):
+        for j in range(len(aacorr)):
+            f.write('%.9f' %corrmat2[i,j]+'\t')
+        f.write("\n\n")
+    f.write("R^2 value : \t" + '%.9f' %AAr_sq)
+    f.close()
 
 
 def plotDispCurve(aaconst, caliConst, data, outName):
@@ -274,28 +316,50 @@ def plotDispCurve(aaconst, caliConst, data, outName):
     x=k*((60-n)/55.5)
     z=np.linspace(min(data[:,0]),max(data[:,0]),1000)
     plt.figure()
+    plt.rcParams.update({'font.size' : 16})
     plt.scatter(data[:,0],data[:,1])
     #Change the inputs below depending on whether N is floating or fixed
     plt.plot(z,DispCurve(z,x,aaconst[0],aaconst[1],n,aaconst[2]))
     #Did you change above?
-    plt.xlabel("CTAB Concentration (uM)")
-    plt.ylabel("Relative SHS signal (Arb. Units)")
+    #plt.xlabel("CTAB Concentration (uM)")
+    #plt.ylabel("Relative SHS signal (Arb. Units)")
     #plt.ylim([0,3500])
-    plt.savefig(outName + '_model_plot.png')
+    plt.savefig(outName + '_disp_model_plot.png')
     plt.show()
 
 
 #want to make a plot of fractional coverage wrt concentration
+def plotDispCoverage(dispData, dye_conc, caliConst, dispConst, outName):
+    z = np.linspace(min(dispData[:,0]), max(dispData[:,0]), 1000)
+    startDyeCoverage = DispDyeCoverage(dye_conc, 0, caliConst[2], caliConst[3], dispConst[2])
+    plt.figure()
+    plt.rcParams.update({'font.size' : 16})
+    plt.plot(z, DispDyeCoverage(z, dye_conc, caliConst[2], dispConst[2], caliConst[3]), color = 'b')
+    plt.plot(z, (startDyeCoverage - DispDyeCoverage(z, dye_conc, caliConst[2], dispConst[2]\
+                                                    , caliConst[3])), color = 'k')
+    #plt.ylim([0,1])
+    plt.savefig(outName + "_disp_coverage_plot.png")
+    plt.show()
+    
+
+
+#function to be run externally to batch run files
+def extMain(caliDataName, dispDataName):
+    #TODO
+    return 0
 
 if __name__ == "__main__":
     #fit the calibration data and calculation the quality of the fit
     caliConstants, caliCorr, caliData = fitCaliCurve(caliDataName)
-    calcCaliCorrandR(caliConstants, caliCorr, caliData)
+    calcCaliCorrandR(caliConstants, caliCorr, caliData, caliDataName)
     plotCaliCurve(caliConstants, caliData, caliDataName)
+    
+    #plot the coverage of the dye versus conc
+    plotCaliCoverage(caliConstants, caliData, caliDataName)
     
     #fit the displacement curve and calculate the quality of the fit
     dispConstants, dispCorr, dispData = fitDispCurve(dispDataName, caliConstants)
-    calcDispCorrandR(dispConstants, dispCorr, caliConstants, dispData)
+    calcDispCorrandR(dispConstants, dispCorr, caliConstants, dispData, dispDataName)
     plotDispCurve(dispConstants, caliConstants, dispData, dispDataName)
-    
+    plotDispCoverage(dispData, 60, caliConstants, dispConstants, dispDataName)
     
