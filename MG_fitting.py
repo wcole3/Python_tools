@@ -7,21 +7,26 @@ Fitting routine for Langmuir isotherm for use with Malchite green SHS data
 The isotherm is modified to account for adsorbate bulk concentration change 
 resulting from adsorption
 
+Fitting of displacement studies to the 2 species, modified Langmuir isotherm is
+now supported
 
-
+User can choose functionality and generated plots in main()
 
 @author: wcole
 """
 
-import numpy as np
-import matplotlib.pyplot as plt
-import scipy.optimize as sp
+import numpy as np;
+import matplotlib.pyplot as plt;
+import scipy.optimize as sp;
 
 #import the dataset
 #format will be two columns of [Conc., Int.]
-caliDataName = 'nPSB_MG_sp'
-dispDataName = 'nPSB_1uMMG_Caff_SP'
-fixed_dye_conc = 1000
+#calibration data
+caliDataName = 'nPSB_MG_sp';
+#displacement exp data
+dispDataName = 'nPSB_PF_MG_SP';
+#the fixed dye concentration for the displacement data (in the same units as dispData)
+fixed_dye_conc = 1000;
 
 def LangmuirCurve(x, B,a,N,K):
     """Calculate the Langmuir curve for the calibration data set
@@ -43,7 +48,7 @@ def LangmuirCurve(x, B,a,N,K):
     
     
     """
-    return B+np.square(a*(((x+N+(55.5/K))-np.sqrt(np.square(x+N+(55.5/K))-(4*x*N)))/(2*N)))
+    return B+np.square(a*(((x+N+(55.5/K))-np.sqrt(np.square(x+N+(55.5/K))-(4*x*N)))/(2*N)));
 
 def Frac_Cov(c, N, K):
     """The curve defining the fractional coverage of the dye
@@ -60,7 +65,7 @@ def Frac_Cov(c, N, K):
     The value of the fractional coverage the concentration
     
     """
-    return (((c+N+(55.5/K))-np.sqrt(np.square(c+N+(55.5/K))-(4*c*N)))/(2*N))
+    return (((c+N+(55.5/K))-np.sqrt(np.square(c+N+(55.5/K))-(4*c*N)))/(2*N));
 
 def DispCurve(c,x,B,a,N,K):
     """The displacement Langmuir model
@@ -82,7 +87,7 @@ def DispCurve(c,x,B,a,N,K):
     -------
     The expected SHS intensity resulting from competitive adsorption
     """
-    return B+np.square(a*(x/(1+x+(K*((c-N)/55.5)))))
+    return B+np.square(a*(x/(1+x+(K*((c-N)/55.5)))));
 
 
 def DispDyeCoverage(c_1, c_2, N_d, K_1, K_2):
@@ -104,10 +109,25 @@ def DispDyeCoverage(c_1, c_2, N_d, K_1, K_2):
     ------
     The surface coverage of species 1
     """
-    x = (K_1 * ((c_1 - N_d)/55.5))
-    y = (K_2 * ((c_2 - N_d)/55.5))
-    return (x / (1 + x + y))
+    x = (K_1 * ((c_1 - N_d)/55.5));
+    y = (K_2 * ((c_2 - N_d)/55.5));
+    return (x / (1 + x + y));
 
+def IntToCoverage(intensity, caliConst):
+    """
+    Convert SHS intensity to fractional coverage
+    Parameters
+    ----------
+    intensity : the SHS intensity
+    
+    caliConst : the constants obtained from fitting
+    
+    Returns
+    -------
+    The fractonal coverage of the dye on the molecule
+    """
+    return (np.sqrt((intensity - caliConst[0])))/caliConst[1];
+    
 
 def fitCaliCurve(filename):
     """Fit the calibration curve data the to Langmuir model
@@ -220,10 +240,13 @@ def plotCaliCoverage(constants, data, outName):
     outName : the name of the output file
     
     """
+    #need to invert the data points and plot them
+    expCoverages = IntToCoverage(data[:,1], constants);
     x=np.linspace(min(data[:,0]),max(data[:,0]),1000)
     plt.figure()
     plt.rcParams.update({'font.size' : 16})
     plt.plot(x, Frac_Cov(x,constants[2], constants[3]))
+    plt.scatter(data[:,0], expCoverages);
     plt.ylim([0,1])
     plt.savefig(outName + "_cali_coverage_plot.png")
     plt.show()
@@ -250,11 +273,22 @@ def fitDispCurve(fileName, caliConst):
     n=caliConst[2]
     #Be sure to change this appropriately to the fixed dye conc
     x=k*((fixed_dye_conc-n)/55.5)
+    n = n
     #here is the code with N fixed to MG's N value
     AAshg=lambda c, B,a,K: B+np.square(a*(x/(1+x+(K*((c-n)/55.5)))))
-    
-    aaconst, aacorr = sp.curve_fit(AAshg, AAdata[:,0],AAdata[:,1],p0=(1,1,0.01)\
-                                 ,maxfev=1000000,bounds=([0,0,0],[np.inf,np.inf,np.inf]))
+    '''
+    #Not used currently, could be useful in the future
+    #More advanced fitting
+    C = (fixed_dye_conc * k) / 55.5;
+    D = (k * n) / 55.5;
+    AAshgadv = lambda x, B, a, K : B + np.square(a * \
+                                                    (((((K * x) / 55.5) + C + D) - \
+                                                      np.sqrt(np.square((((K * x) / 55.5) + C + D)) -\
+                                                              (4 * (((K * n) / 55.5) + D) * C))) \
+                                                                /(2 * ((((K * n) / 55.5) + D)))))
+    '''
+    aaconst, aacorr = sp.curve_fit(AAshg, AAdata[:,0],AAdata[:,1],p0=(0,10,0.0001)\
+                                 ,maxfev=1000000,bounds=([0,0,0],[min(AAdata[:,1]), np.inf, np.inf]))
     
     return aaconst, aacorr, AAdata
 
@@ -277,6 +311,7 @@ def calcDispCorrandR(aaconst, aacorr, caliConst, AAdata, outName):
     n=caliConst[2]
     #Be sure to change this appropriately to the fixed dye conc
     x=k*((fixed_dye_conc-n)/55.5)
+    n = n
     print(aaconst)
     perr2=np.sqrt(np.diag(aacorr))
     print(perr2)
@@ -335,12 +370,13 @@ def plotDispCurve(aaconst, caliConst, data, outName):
     n=caliConst[2]
     #Be sure to change this appropriately to the fixed dye conc
     x=k*((fixed_dye_conc - n)/55.5)
+    n = n 
     z=np.linspace(min(data[:,0]),max(data[:,0]),1000)
     plt.figure()
     plt.rcParams.update({'font.size' : 16})
-    plt.scatter(data[:,0],data[:,1])
+    plt.scatter(data[:,0]/1000,data[:,1])
     #Change the inputs below depending on whether N is floating or fixed
-    plt.plot(z,DispCurve(z,x,aaconst[0],aaconst[1],n,aaconst[2]))
+    plt.plot(z/1000,DispCurve(z,x,aaconst[0],aaconst[1],n,aaconst[2]))
     #Did you change above?
     #plt.xlabel("CTAB Concentration (uM)")
     #plt.ylabel("Relative SHS signal (Arb. Units)")
@@ -369,15 +405,30 @@ def plotDispCoverage(dispData, dye_conc, caliConst, dispConst, outName):
     dispCoverage = DispDyeCoverage(z, dye_conc, caliConst[2], dispConst[2], caliConst[3])
     knownDyeCov = Frac_Cov(dye_conc, caliConst[2], caliConst[3])
     caliDyeCoverage = DispDyeCoverage(dye_conc, z, caliConst[2], caliConst[3], dispConst[2])
-    totalCoverage = (caliDyeCoverage + dispCoverage)
+    #Covert the exp intensities to coverages
+    expCoverages = IntToCoverage(dispData[:,1], dispConst);
+    expCoverages = (expCoverages / expCoverages[0]) * knownDyeCov
     plt.figure()
     plt.rcParams.update({'font.size' : 16})
-    plt.plot(np.log10(z), (dispCoverage/totalCoverage), color = 'b')
-    plt.plot(np.log10(z), (caliDyeCoverage/totalCoverage), color = 'k')
-    #plt.plot(np.log10(z), (totalCoverage), color = 'r')
-    plt.ylim([0,1])
+    plt.plot(z/1000, ((caliDyeCoverage) / caliDyeCoverage[0]) * knownDyeCov)
+    plt.scatter(dispData[:,0]/1000, expCoverages);
+    #plt.ylim([0,1])
     plt.savefig(outName + "_disp_coverage_plot.png")
     plt.show()
+    #might as well get R^2 here
+    ss_res = 0
+    ss_total = 0
+    residuals = np.zeros([len(dispData[:,0]), 1])
+    for i in range(len(dispData[:,0])):
+        predictedDyeCov = DispDyeCoverage(dye_conc, dispData[i,0], caliConst[2], caliConst[3], dispConst[2])
+        scaledPredictedDyeCov = (predictedDyeCov / caliDyeCoverage[0]) * knownDyeCov
+        residuals[i] = scaledPredictedDyeCov - expCoverages[i]
+        ss_res += np.square(residuals[i])
+        ss_total += np.square((expCoverages[i] - np.average(expCoverages[:])))
+    print(ss_res)
+    print(ss_total)
+    r_sq = 1 - (ss_res/ss_total)
+    print(r_sq)
     
 
 
@@ -399,5 +450,5 @@ if __name__ == "__main__":
     dispConstants, dispCorr, dispData = fitDispCurve(dispDataName, caliConstants)
     calcDispCorrandR(dispConstants, dispCorr, caliConstants, dispData, dispDataName)
     plotDispCurve(dispConstants, caliConstants, dispData, dispDataName)
-    plotDispCoverage(dispData, fixed_dye_conc, caliConstants, dispConstants, dispDataName)
+    #plotDispCoverage(dispData, fixed_dye_conc, caliConstants, dispConstants, dispDataName)
     
