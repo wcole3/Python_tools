@@ -10,5 +10,5 @@ fitting competitive adsorption to a displacment Langmuir model
 
 PLOT shell_use: old plotting script used to quickly plot spectra obtained from VRT experiment
 
-SHG_scattering_plotall: Method to process batches of files outputted from SHS experiment with CCD detection.  Some data 
-processing occurs inside the script including removing cosmic ray impacts and fitting to a Gaussian for siganl quantification
+SHG_scattering_plotall: Method to process batches of files output from SHS experiment with CCD detection.  Some data 
+processing occurs inside the script including removing cosmic ray impacts and fitting to a Gaussian for signal quantification
